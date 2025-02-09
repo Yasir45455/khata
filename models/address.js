@@ -1,9 +1,10 @@
 const mongoose = require('mongoose');
 
 const addressSchema = new mongoose.Schema({
-    user_id: {
-        type: String,
-    },
+    // user_id: {
+    //     type: String,
+    // },
+    address_type : {type: String},
     guest_id: { type: String, required: true, unique: true },
 
     house_no: {

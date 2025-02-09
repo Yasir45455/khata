@@ -4,6 +4,7 @@ exports.createProduct = async (req, res) => {
   try {
     const productData = { ...req.body };
     // const productData = { ...req.body, image: req.file.path };
+    console.log(productData)
     const product = await productService.createProduct(productData);
     res.status(201).json(product);
   } catch (error) {

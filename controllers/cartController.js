@@ -1,79 +1,125 @@
-const cartModel = require("../models/cart");
+const Cart = require("../models/cart");
 require('dotenv').config();
 const { validationResult } = require("express-validator");
 var mongoose = require('mongoose');
-const ProductModel = require("../models/products");
-const { v4: uuidv4 } = require('uuid'); 
-
-
+const Product = require("../models/products");
+const { v4: uuidv4 } = require('uuid');
 
 async function addProductToCart(req, res) {
-    const { product_id, quantity } = req.params;
-
-    const parsedQuantity = parseInt(quantity);
-    if (!Number.isInteger(parsedQuantity) || parsedQuantity < 0) {
-        return res.status(400).json({ error: 'Quantity must be a non-negative integer' });
-    }
-
     try {
-        const product = await ProductModel.findById(product_id);
+        const { guestId, product_id, quantity, gift, size, extras } = req.body;
+
+        // Find the product by product_id
+        const product = await Product.findById(product_id);
         if (!product) {
-            return res.status(404).json({ error: 'Product not found' });
+            return res.status(404).json({ success: false, error: "Product not found" });
         }
 
-        // Get guestId from headers or create a new one
-        let guestId = req.headers['guest-id'] || null;
-        if (!guestId) {
-            guestId = uuidv4(); // Generate unique guest ID
+        // Determine price based on size
+        let basePrice = 0;
+        if (size === 'small') basePrice = product.small_price;
+        else if (size === 'medium') basePrice = product.medium_price;
+        else if (size === 'large') basePrice = product.large_price;
+        else basePrice = product.price;
+
+        // Calculate total price based on quantity
+        let totalPrice = basePrice * quantity;
+
+        // Add extras prices
+        if (extras && Array.isArray(extras)) {
+            const extrasTotal = extras.reduce((acc, extra) => acc + (extra.price || 0), 0);
+            totalPrice += extrasTotal;
         }
 
-        // Find cart for the guest user
-        let cart = await cartModel.findOne({ guestId });
+        // Convert totalPrice to float
+        totalPrice = parseFloat(totalPrice.toFixed(2)); // Ensure 2 decimal precision
+
+        // Check if cart exists for the guestId
+        let cart = await Cart.findOne({ guestId });
 
         if (!cart) {
-            if (parsedQuantity === 0) {
-                return res.status(400).json({ error: 'Cannot add zero quantity of a product to a new cart' });
-            }
-            cart = new cartModel({ guestId, products: [] });
-        }
-
-        // Check if product is already in the cart
-        const productIndex = cart.products.findIndex(item => item.product_ID.toString() === product_id);
-
-        if (productIndex > -1) {
-            if (parsedQuantity === 0) {
-                cart.products.splice(productIndex, 1); // Remove product if quantity is 0
-            } else {
-                cart.products[productIndex].quantity = parsedQuantity; // Update quantity
-            }
+            // Create new cart if not exists
+            cart = new Cart({
+                guestId,
+                products: [{
+                    product_ID: product_id,
+                    quantity,
+                    gift: gift || "",
+                    size: size || "",
+                    extras: extras || [],
+                    total: totalPrice // Store as a float
+                }],
+                sub_total: totalPrice // Initialize sub_total for new cart
+            });
         } else {
-            if (parsedQuantity === 0) {
-                return res.status(400).json({ error: 'Cannot add zero quantity of a product to the cart' });
+            // Check if product already exists in cart
+            const existingProductIndex = cart.products.findIndex(p => p.product_ID.toString() === product_id);
+            
+            if (existingProductIndex !== -1) {
+                // Recalculate total price based on updated quantity
+                const existingProduct = cart.products[existingProductIndex];
+                
+                // Recalculate base price for the product based on size
+                let basePrice = 0;
+                if (size === 'small') basePrice = product.small_price;
+                else if (size === 'medium') basePrice = product.medium_price;
+                else if (size === 'large') basePrice = product.large_price;
+                else basePrice = product.price;
+            
+                // Calculate total price for the updated quantity
+                let updatedTotalPrice = basePrice * (existingProduct.quantity + quantity);
+            
+                // Add extras prices
+                if (extras && Array.isArray(extras)) {
+                    const extrasTotal = extras.reduce((acc, extra) => acc + (extra.price || 0), 0);
+                    updatedTotalPrice += extrasTotal;
+                }
+            
+                updatedTotalPrice = parseFloat(updatedTotalPrice.toFixed(2)); // Ensure 2 decimal precision
+            
+                // Update product details
+                cart.products[existingProductIndex].quantity += quantity;
+                cart.products[existingProductIndex].extras = [...cart.products[existingProductIndex].extras, ...extras];
+                cart.products[existingProductIndex].total = updatedTotalPrice; // Update total price
+            } else {
+                // Add new product
+                cart.products.push({
+                    product_ID: product_id,
+                    quantity,
+                    gift: gift || "",
+                    size: size || "",
+                    extras: extras || [],
+                    total: totalPrice // Store as a float
+                });
             }
-            cart.products.push({ product_ID: product_id, quantity: parsedQuantity });
+            
         }
 
-        const updatedCart = await cart.save();
+        // Calculate the new sub_total as the sum of all product totals
+        cart.sub_total = cart.products.reduce((acc, product) => acc + product.total, 0);
+        cart.sub_total = parseFloat(cart.sub_total.toFixed(2)); // Ensure sub_total is a float with 2 decimal precision
 
-        res.status(200).json({ cart: updatedCart, guestId }); // Return updated cart with guestId
+        // Save updated cart
+        await cart.save();
+
+        return res.status(200).json({ success: true, data: cart });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error("Error:", err.message);
+        return res.status(500).json({ success: false, error: err.message });
     }
 }
 
 
 async function getCart(req, res) {
     try {
-        const { guestId } = req.params; // Extract guestId from params
+        const { guestId } = req.params;
 
-        // Find the cart based on guestId and populate the product details
-        const cart = await cartModel.findOne({ guestId }).populate({
+        const cart = await Cart.findOne({ guestId }).populate({
             path: 'products.product_ID',
             model: 'Products',
-            select: 'name description category subCategory height width weight sku images price'
+            select: 'name shortDescription category subCategory  price small_price medium_price large_price gifts extra'
         });
 
-        // Check if the cart exists
         if (!cart) {
             return res.status(404).json({ error: 'Cart not found for the specified guestId' });
         }

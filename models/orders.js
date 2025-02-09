@@ -1,20 +1,13 @@
 const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
-    // user_id: {
-    //     type: mongoose.Schema.Types.ObjectId,
-    //     ref: 'User',
-    //     required: true
-    // },
+    guest_id: { type: String, required: true },
     address_id: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Address',
         required: true
     },
-    price: {
-        type: Number,
-        required: true
-    },
+  
     total_with_tip :
     {
         type:String,
@@ -30,7 +23,21 @@ const orderSchema = new mongoose.Schema({
                 type: Number,
                 required: true,
                 min: 1
-            }
+            },
+            gift: {
+                type: String,
+                default: ''
+            },
+            size: {
+                type: String,
+                default: ''
+            },
+            extras: [
+                {
+                    name: { type: String },
+                    price: { type: Number }
+                }
+            ] ,
         }
     ]
 }, {
