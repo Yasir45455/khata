@@ -1,12 +1,8 @@
 
 
 const jwt = require('jsonwebtoken');
-require('dotenv').config();
-
-
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
-
   if (!authHeader) {
     return res.status(401).send("Authorization header missing.");
   }
@@ -17,12 +13,12 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).send("Authorization failed.");
   }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  jwt.verify(token, 'c31799edb8a2a0e582eb905245f1a6cffb80991eeb35bf5df5f4ebc4d613f46c819234', (err, user) => {
     if (err) {
       return res.status(401).send("Authorization failed.");
     }
 
-    req.user = user; 
+    req.user = user; // Attach the user to the request object
     next();
   });
 };
@@ -39,7 +35,7 @@ const authenticateAdmin = (req, res, next) => {
   if (!token) {
     return res.status(401).send("Authorization failed.");
   }
-  jwt.verify(token,  process.env.JWT_SECRET , (err, user) => {
+  jwt.verify(token, 'c31799edb8a2a0e582eb905245f1a6cffb80991eeb35bf5df5f4ebc4d613f46c819234', (err, user) => {
     if (err) {
       return res.status(401).send("Authorization failed.");
     }

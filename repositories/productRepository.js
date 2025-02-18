@@ -1,7 +1,9 @@
-const Products = require('../models/products');
+const Product = require("../models/productModel");
 
-exports.createProduct = (productData) => Products.create(productData);
-exports.getProducts = () => Products.find().populate('category');
-exports.getProductById = (id) => Products.findById(id).populate('category');
-exports.updateProduct = (id, updateData) => Products.findByIdAndUpdate(id, updateData, { new: true });
-exports.deleteProduct = (id) => Products.findByIdAndDelete(id);
+const createProduct = async (data) => await Product.create(data);
+const getAllProducts = async () => await Product.find();
+const getProductById = async (id) => await Product.findById(id);
+const updateProduct = async (id, data) => await Product.findByIdAndUpdate(id, data, { new: true });
+const deleteProduct = async (id) => await Product.findByIdAndDelete(id);
+
+module.exports = { createProduct, getAllProducts, getProductById, updateProduct, deleteProduct };
